@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KLAS — Offline</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0B1D3A;
+      font-family: 'DM Sans', sans-serif;
+      color: #fff;
+      text-align: center;
+      padding: 2rem;
+    }
+    .icon { font-size: 4rem; margin-bottom: 1.5rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: .75rem; color: #C9963A; }
+    p { color: #94A3B8; font-size: .9rem; line-height: 1.6; margin-bottom: 1.5rem; }
+    button {
+      padding: .75rem 2rem;
+      background: linear-gradient(135deg, #C9963A, #E8B85A);
+      color: #0B1D3A;
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: .9rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="icon">📡</div>
+    <h1>You're Offline</h1>
+    <p>Please check your internet connection and try again. KLAS needs a connection to load school data.</p>
+    <button onclick="window.location.reload()">Try Again</button>
+  </div>
+</body>
+</html>

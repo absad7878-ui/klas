@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* ========================================= */
+/* Basic resets & dark mode variables        */
+/* ========================================= */
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #0D47A1;      /* Deep blue */
+  --secondary: #2E7D32;    /* Green */
+  --accent: #F9A825;       /* Gold */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Image dark/light switching (keep your original logic) */
+.imgDark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+
+  .imgLight {
+    display: none;
+  }
+  .imgDark {
+    display: unset;
+  }
+}
+
+/* Optional: global typography improvements */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+button, [role="button"] {
+  cursor: pointer;
+}

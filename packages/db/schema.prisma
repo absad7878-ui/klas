@@ -1,0 +1,572 @@
+// packages/db/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // URL is managed in prisma.config.ts — do NOT add url = env("...")
+}
+
+model School {
+  id                 String   @id @default(uuid())
+  name               String
+  subdomain          String   @unique
+
+  // NEW - basic profile fields
+  address            String?  // e.g. "123 Education Street, Lagos"
+  phone              String?  // e.g. "+234 123 456 7890"
+  email              String?  // official email
+  website            String?  // full website if different from subdomain
+  description        String?  // short "About the school" text
+  logoUrl            String?
+  coverImageUrl      String?  // optional banner image at top of profile
+  bankName      String?
+  accountNumber String?
+  accountName   String?
+  subscription       Subscription?
+
+  smsSettings   SmsSettings?
+  smsLogs       SmsLog[]
+  academicTerms  AcademicTerm[]
+  
+
+  gradingSystem      Json?
+  academicStructure  Json?
+  isActive           Boolean  @default(true)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  users              User[]
+  roles              Role[]
+  classes            Class[]
+  parents            Parent[]
+  students           Student[]
+  teachers           Teacher[]
+  attendances        Attendance[]
+  examSubjects ExamSubject[]
+  examResults  ExamResult[]
+  reportCards  ReportCard[]
+  announcements    Announcement[]
+  pushSubscriptions PushSubscription[]
+  
+
+  @@map("schools")
+}
+
+
+model User {
+  id String @id @default(uuid())
+  email String @unique
+  password String // bcrypt hashed
+  roleId String
+  schoolId String? // nullable for platform users
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  school School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  
+  teacher   Teacher? @relation("UserTeacher")
+  teacherId String?  @unique
+
+  // ADD THIS LINE (reverse of Attendance.user)
+  attendances Attendance[]
+  assignments Assignment[]
+  scores      Score[]
+  passwordResetTokens PasswordResetToken[]
+
+
+  @@index([schoolId])
+  @@index([roleId])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String
+  permissions Json     // e.g. ["manage_students", "view_results", "*"]
+  schoolId    String?  // ← nullable (platform-level roles have null)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School?  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  users       User[]
+
+  @@index([schoolId])
+  @@unique([name, schoolId])   // per-tenant unique role names
+  @@map("roles")
+}
+
+model Class {
+  id          String   @id @default(uuid())
+  name        String
+  schoolId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  attendances Attendance[]
+  assignments Assignment[]
+  scores      Score[]
+  attendanceRecords AttendanceRecord[]
+
+
+  @@index([schoolId])
+  @@map("classes")
+}
+
+model Parent {
+  id String @id @default(uuid())
+  name String
+  phone String?
+  email String?
+  address String?
+  schoolId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  students Student[]
+  attendances Attendance[]   // ← keep only this one (remove the other duplicate)
+  @@index([schoolId])
+  @@unique([phone, schoolId])
+  @@map("parents")
+}
+
+model Student {
+  id String @id @default(uuid())
+  firstName String
+  lastName String
+  studentId String @unique
+  dateOfBirth DateTime?
+  gender String?
+  className String? // ← free text
+  parentId String?
+  schoolId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parent Parent? @relation(fields: [parentId], references: [id])
+  attendances Attendance[]   // ← ADD THIS LINE
+  assignmentSubmissions AssignmentSubmission[]
+  scores                Score[]
+  feeStatuses           FeeStatus[]
+  examResults  ExamResult[]
+  reportCards  ReportCard[]
+  attendanceRecords AttendanceRecord[]
+
+
+  @@index([schoolId])
+  @@index([parentId])
+  @@map("students")
+}
+
+model Attendance {
+  id        String   @id @default(uuid())
+  studentId String
+  classId   String
+  userId    String   // this is the correct field
+  subject   String?
+  date      DateTime
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  schools   School[]
+  parents   Parent[]
+
+  @@index([studentId])
+  @@index([classId])
+  @@index([userId])
+  @@index([date])
+  @@unique([studentId, date])
+  @@map("attendance")
+}
+
+model Teacher {
+  id String @id @default(uuid())
+  firstName String
+  lastName String
+  email String @unique
+  phone String?
+  userId    String?  @unique
+  user      User?    @relation("UserTeacher", fields: [userId], references: [id], onDelete: Cascade)
+ 
+
+ 
+  schoolId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  @@index([schoolId])
+  @@map("teachers")
+}
+
+model Assignment {
+  id          String   @id @default(uuid())
+  classId     String
+  teacherId   String   // or userId
+  title       String
+  description String?
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher     User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  submissions AssignmentSubmission[]
+
+  @@index([classId])
+  @@index([teacherId])
+  @@map("assignments")
+}
+
+model AssignmentSubmission {
+  id            String   @id @default(uuid())
+  assignmentId  String
+  studentId     String
+  submittedAt   DateTime?
+  content       String?  // text or file URL
+  grade         Float?
+  feedback      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student       Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId])
+  @@index([studentId])
+  @@map("assignment_submissions")
+}
+
+model Score {
+  id              String   @id @default(uuid())
+  studentId       String
+  classId         String
+  userId          String   // ← changed from teacherId to userId (since teachers are Users)
+  term            String
+  assessmentType  String
+  score           Float
+  maxScore        Float
+  comments        String?
+  dateEntered     DateTime @default(now())  // ← renamed for clarity (date score was entered)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class           Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher         User     @relation(fields: [userId], references: [id], onDelete: Cascade)  // ← changed
+
+  @@index([studentId])
+  @@index([classId])
+  @@index([userId])          // ← updated index
+  @@index([term, assessmentType])
+  @@map("scores")
+}
+
+model FeeStatus {
+  id            String   @id @default(uuid())
+  studentId     String
+  term          String   // "Term 1 2025/2026"
+  amountDue     Float
+  amountPaid    Float    @default(0)
+  status        String   // "Paid", "Partial", "Unpaid"
+  lastPaymentDate DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@unique([studentId, term])  // ← add this line to FeeStatus model
+
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([term])
+  @@map("fee_status")
+}
+
+model SmsSettings {
+  id            String  @id @default(cuid())
+  schoolId      String  @unique
+  school        School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  enabled       Boolean @default(false)   // master on/off switch
+  sendOnPresent Boolean @default(false)   // send SMS when student is present
+  sendOnAbsent  Boolean @default(true)    // send SMS when student is absent
+  termiiApiKey  String  @default("")
+  credits       Int     @default(0)       // 1 credit = 1 SMS
+  senderId      String  @default("SchoolApp") // Termii sender ID / name
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SmsLog {
+  id          String   @id @default(cuid())
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  studentId   String   // student DB id, or "SYSTEM" for top-ups
+  phone       String   // phone number the SMS was sent to
+  message     String   // full message text
+  status      String   // "sent" | "failed" | "skipped" | "topup"
+  creditsUsed Int      @default(1)  // negative for top-ups
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, status])
+}
+
+model ExamSubject {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name     String   // e.g. "Mathematics"
+  order    Int      @default(0)  // display order on report card
+  isActive Boolean  @default(true)
+
+  examResults ExamResult[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, name])           // no duplicate subjects per school
+  @@index([schoolId])
+}
+
+// One row = one student's score for one subject in one term
+model ExamResult {
+  id        String @id @default(cuid())
+  schoolId  String
+  school    School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  studentId  String
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  subjectId  String
+  subject    ExamSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  classId    String   // which class the student was in for this term
+  term       String   // "Term 1 2025" | "Term 2 2025" | "Term 3 2025"
+  session    String   // "2024/2025"
+
+  caScore    Float   @default(0)    // Continuous Assessment (max 40)
+  examScore  Float   @default(0)    // Exam score (max 60)
+  total      Float   @default(0)    // caScore + examScore (auto-calculated, max 100)
+
+  grade      String  @default("")   // A, B, C, D, F
+  remark     String  @default("")   // Excellent, Good, etc.
+
+  teacherComment String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One score per student per subject per term per session
+  @@unique([schoolId, studentId, subjectId, term, session])
+  @@index([schoolId, classId, term, session])
+  @@index([schoolId, studentId, term, session])
+}
+
+// Computed summary per student per term — generated after all scores are entered
+model ReportCard {
+  id        String @id @default(cuid())
+  schoolId  String
+  school    School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  classId   String
+  className String   // stored so it's preserved even if class is renamed
+  term      String   // "Term 1 2025"
+  session   String   // "2024/2025"
+
+  totalMarks    Float   // sum of all subject totals
+  averageScore  Float   // totalMarks / number of subjects
+  numberOfSubjects Int
+
+  position      Int     @default(0)   // 1st, 2nd, 3rd in class
+  totalStudents Int     @default(0)   // how many students in class this term
+
+  grade         String  // overall grade based on average
+  remark        String  // overall remark
+
+  // Teacher/principal remarks
+  classTeacherRemark  String @default("")
+  principalRemark     String @default("")
+
+  isPublished Boolean @default(false)  // false = only staff can see, true = parents can see
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, studentId, term, session])
+  @@index([schoolId, classId, term, session])
+}
+
+model Subscription {
+  id                String   @id @default(uuid())
+  schoolId          String   @unique
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  status            String   @default("trial")
+  // "trial"    → within 14-day free trial
+  // "active"   → paid and current
+  // "expired"  → trial ended or payment lapsed, no access
+  // "grace"    → paid but expiring within 3 days (banner warning)
+
+  trialStartDate    DateTime @default(now())
+  trialEndDate      DateTime // set to trialStartDate + 14 days on school registration
+
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?   // set to 30 days after each payment
+
+  paystackReference  String?  // last successful payment reference
+  amountPaid         Float?   // in Naira
+  lastPaymentDate    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments SubscriptionPayment[]
+
+  @@map("subscriptions")
+}
+
+// Full payment history — one row per month paid
+model SubscriptionPayment {
+  id              String   @id @default(uuid())
+  subscriptionId  String
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  paystackReference String  @unique
+  amount            Float   // in Naira (5000)
+  status            String  // "success" | "failed"
+  paidAt            DateTime?
+
+  periodStart DateTime
+  periodEnd   DateTime  // periodStart + 30 days
+
+  createdAt DateTime @default(now())
+
+  @@index([subscriptionId])
+  @@map("subscription_payments")
+}
+
+// For forgot-password flow — one token per user, expires in 1 hour
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token     String   @unique  // hashed token stored here; raw token sent in email
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model AcademicTerm {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String   // "First Term", "Second Term", "Third Term"
+  session   String   // "2025/2026"
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, name, session])
+  @@index([schoolId])
+}
+
+model AttendanceRecord {
+  id        String   @id @default(cuid())
+  classId   String
+  studentId String
+  date      DateTime @db.Date
+  status    AttendanceStatus @default(PRESENT)
+  subject   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  class   Class   @relation(fields: [classId],   references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Prevents duplicate records for the same student/class/date
+  @@unique([studentId, classId, date])
+  @@index([classId, date])
+  @@index([studentId])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+model PlatformConfig {
+  id         String   @id @default(cuid())
+  atApiKey   String   @default("")
+  atUsername String   @default("sandbox")
+  senderId   String   @default("SchoolApp")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("platform_config")
+}
+
+model Announcement {
+  id             String   @id @default(cuid())
+  schoolId       String
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)  // ← must be here
+  title          String
+  content        String
+  targetAudience String   @default("all")
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([schoolId])
+  @@map("announcements")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)  // ← add this line
+  userId    String
+  role      String
+  fcmToken  String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+model ParentAccount {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String   @default("")
+  passwordHash String   @default("")
+  isVerified   Boolean  @default(false)
+  inviteToken  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

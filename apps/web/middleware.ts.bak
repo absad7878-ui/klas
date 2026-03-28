@@ -1,0 +1,77 @@
+// apps/web/middleware.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+const PUBLIC_PATHS = [
+  '/register',
+  '/search',
+  '/api',
+  '/_next',
+  '/favicon.ico',
+  '/static',
+  // Add more public routes if needed (e.g. '/login', '/about')
+];
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Get hostname safely – fallback to 'localhost:3000' for local/dev
+  const hostname = request.headers.get('host') ?? 'localhost:3000';
+
+  // Remove port if present (handles localhost:3000, example.com:8080, etc.)
+  const hostWithoutPort = hostname.split(':')[0] ?? 'localhost';
+
+  const parts = hostWithoutPort.toLowerCase().split('.');
+
+  // Determine if there's a subdomain
+  // Examples:
+  //   localhost → no subdomain
+  //   testschool.localhost → 'testschool'
+  //   school.platform.com → 'school'
+  //   www.platform.com → treat as main (no subdomain)
+  let subdomain: string | undefined = undefined;
+
+  const isMainDomainLike =
+    parts.length <= 2 ||
+    (parts.length === 3 && parts[0] === 'www') ||
+    hostWithoutPort.includes('localhost');
+
+  if (!isMainDomainLike && parts.length >= 2) {
+    subdomain = parts[0]; // already lowered
+  }
+
+  // Skip middleware entirely for public/static/API paths
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  // Main domain → proceed to public/super-admin/registration pages
+  if (!subdomain || subdomain === 'www') {
+    return NextResponse.next();
+  }
+
+  // Tenant subdomain detected → rewrite to tenant route group
+  const url = request.nextUrl.clone();
+  url.pathname = `/tenant/${subdomain}${pathname === '/' ? '' : pathname}`;
+
+  // Pass subdomain to pages / API calls via custom header
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-school-subdomain', subdomain);
+
+  return NextResponse.rewrite(url, {
+    request: { headers: requestHeaders },
+  });
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Apply to all paths EXCEPT:
+     * - API routes
+     * - Next.js internals (_next/*)
+     * - Static files
+     * - favicon
+     * - Explicit public paths (register, search, etc.)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|register|search).*)',
+  ],
+};
