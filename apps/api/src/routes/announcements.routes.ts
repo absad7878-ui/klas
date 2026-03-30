@@ -8,7 +8,27 @@ import jwt from 'jsonwebtoken';
 const router  = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
-// ── GET /announcements — authenticated (admin/teacher) ────────────────────────
+// ── Safe upsert helper — works even after DB reset ────────────────────────────
+async function safeUpsertSubscription(data: {
+  fcmToken: string;
+  schoolId: string;
+  userId:   string;
+  role:     string;
+}) {
+  try {
+    await prisma.pushSubscription.upsert({
+      where:  { fcmToken: data.fcmToken },
+      create: data,
+      update: { schoolId: data.schoolId, userId: data.userId, role: data.role },
+    });
+  } catch {
+    // Fallback if upsert fails (e.g. stale unique index after DB reset)
+    await prisma.pushSubscription.deleteMany({ where: { fcmToken: data.fcmToken } });
+    await prisma.pushSubscription.create({ data });
+  }
+}
+
+// ── GET /announcements — authenticated ────────────────────────────────────────
 router.get('/', authenticate, async (req: any, res) => {
   try {
     const schoolId = req.user.schoolId;
@@ -42,7 +62,6 @@ router.post('/', authenticate, async (req: any, res) => {
       data: { schoolId, title, content, targetAudience, createdBy: userId },
     });
 
-    // Find all push subscriptions for this school matching the target audience
     const whereRole: any = { schoolId };
     if (targetAudience !== 'all') whereRole.role = targetAudience;
 
@@ -81,19 +100,14 @@ router.post('/', authenticate, async (req: any, res) => {
 });
 
 // ── POST /announcements/subscribe ─────────────────────────────────────────────
-// Works for ALL roles:
-// - Admin/Teacher: authenticated via school JWT (schoolId from req.user)
-// - Parent: sends parentToken in body → we decode it to get their schoolIds
-// - Anonymous: must send schoolId in body
 router.post('/subscribe', async (req: any, res) => {
   try {
-    const { fcmToken, role, schoolId: bodySchoolId, parentToken } = req.body;
+    const { fcmToken, role, schoolId: bodySchoolId } = req.body;
 
     if (!fcmToken || !role) {
       return res.status(400).json({ error: 'fcmToken and role are required' });
     }
 
-    // Try to get auth from header (admin/teacher)
     let schoolId: string | null = null;
     let userId   = 'anonymous';
 
@@ -102,19 +116,20 @@ router.post('/subscribe', async (req: any, res) => {
       try {
         const headerToken = authHeader.replace('Bearer ', '');
         const payload: any = jwt.verify(headerToken, JWT_SECRET);
+
         // School admin/teacher token
         if (payload.schoolId) {
           schoolId = payload.schoolId;
           userId   = payload.id || 'anonymous';
         }
-        // Parent token — get their children's school IDs
+
+        // Parent token — subscribe to ALL schools their children attend
         if (payload.parentId && payload.role === 'parent') {
           userId = payload.parentId;
-          // Use schoolId from body if provided, or subscribe to all their schools
+
           if (bodySchoolId) {
             schoolId = bodySchoolId;
           } else {
-            // Find all schools this parent's children attend
             const parent = await prisma.parentAccount.findUnique({
               where: { id: payload.parentId },
             });
@@ -123,35 +138,30 @@ router.post('/subscribe', async (req: any, res) => {
                 where:  { parent: { email: parent.email } },
                 select: { schoolId: true },
               });
-              const schoolIds = [...new Set(students.map(s => s.schoolId).filter(Boolean))];
-              // Subscribe to ALL schools this parent has children in
+              const schoolIds = [...new Set(
+                students.map(s => s.schoolId).filter(Boolean) as string[]
+              )];
+
+              // ── Use safe upsert for each school ──
               for (const sid of schoolIds) {
-                if (!sid) continue;
-                await prisma.pushSubscription.upsert({
-                  where:  { fcmToken },
-                  create: { schoolId: sid, userId, role, fcmToken },
-                  update: { schoolId: sid, userId, role },
-                });
+                await safeUpsertSubscription({ fcmToken, schoolId: sid, userId, role });
               }
+
               return res.json({ success: true, subscribedTo: schoolIds.length });
             }
           }
         }
-      } catch { /* invalid token — fall through */ }
+      } catch { /* invalid token — fall through to body schoolId */ }
     }
 
     // Fallback: use schoolId from body
     if (!schoolId) schoolId = bodySchoolId;
-
     if (!schoolId) {
       return res.status(400).json({ error: 'schoolId is required' });
     }
 
-    await prisma.pushSubscription.upsert({
-      where:  { fcmToken },
-      create: { schoolId, userId, role, fcmToken },
-      update: { schoolId, userId, role },
-    });
+    // ── Use safe upsert ──
+    await safeUpsertSubscription({ fcmToken, schoolId, userId, role });
 
     res.json({ success: true });
   } catch (error) {
