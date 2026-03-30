@@ -22,13 +22,12 @@ async function safeUpsertSubscription(data: {
       update: { schoolId: data.schoolId, userId: data.userId, role: data.role },
     });
   } catch {
-    // Fallback if upsert fails (e.g. stale unique index after DB reset)
     await prisma.pushSubscription.deleteMany({ where: { fcmToken: data.fcmToken } });
     await prisma.pushSubscription.create({ data });
   }
 }
 
-// ── GET /announcements — authenticated ────────────────────────────────────────
+// ── GET /announcements — authenticated (school admin/teacher) ─────────────────
 router.get('/', authenticate, async (req: any, res) => {
   try {
     const schoolId = req.user.schoolId;
@@ -42,6 +41,65 @@ router.get('/', authenticate, async (req: any, res) => {
 
     res.json(announcements);
   } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch announcements' });
+  }
+});
+
+// ── GET /announcements/parent — parent auth (JWT with parentId) ───────────────
+// Returns all announcements across all schools the parent's children attend
+router.get('/parent', async (req: any, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+
+    const token = authHeader.replace('Bearer ', '');
+    let payload: any;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    if (!payload.parentId || payload.role !== 'parent') {
+      return res.status(403).json({ error: 'Parent access only' });
+    }
+
+    // Find all schools this parent's children attend
+    const parent = await prisma.parentAccount.findUnique({
+      where: { id: payload.parentId },
+    });
+    if (!parent) return res.status(404).json({ error: 'Parent not found' });
+
+    const students = await prisma.student.findMany({
+      where:  { parent: { email: parent.email } },
+      select: { schoolId: true, school: { select: { name: true } } },
+    });
+
+    const schoolIds = [...new Set(
+      students.map(s => s.schoolId).filter(Boolean) as string[]
+    )];
+
+    if (schoolIds.length === 0) return res.json([]);
+
+    // Fetch announcements for all those schools
+    const announcements = await prisma.announcement.findMany({
+      where: {
+        schoolId: { in: schoolIds },
+        OR: [
+          { targetAudience: 'all' },
+          { targetAudience: 'parent' },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take:    50,
+      include: {
+        school: { select: { name: true, subdomain: true } },
+      },
+    });
+
+    res.json(announcements);
+  } catch (error) {
+    console.error('Parent announcements error:', error);
     res.status(500).json({ error: 'Failed to fetch announcements' });
   }
 });
@@ -117,13 +175,11 @@ router.post('/subscribe', async (req: any, res) => {
         const headerToken = authHeader.replace('Bearer ', '');
         const payload: any = jwt.verify(headerToken, JWT_SECRET);
 
-        // School admin/teacher token
         if (payload.schoolId) {
           schoolId = payload.schoolId;
           userId   = payload.id || 'anonymous';
         }
 
-        // Parent token — subscribe to ALL schools their children attend
         if (payload.parentId && payload.role === 'parent') {
           userId = payload.parentId;
 
@@ -142,7 +198,6 @@ router.post('/subscribe', async (req: any, res) => {
                 students.map(s => s.schoolId).filter(Boolean) as string[]
               )];
 
-              // ── Use safe upsert for each school ──
               for (const sid of schoolIds) {
                 await safeUpsertSubscription({ fcmToken, schoolId: sid, userId, role });
               }
@@ -151,16 +206,14 @@ router.post('/subscribe', async (req: any, res) => {
             }
           }
         }
-      } catch { /* invalid token — fall through to body schoolId */ }
+      } catch { /* invalid token — fall through */ }
     }
 
-    // Fallback: use schoolId from body
     if (!schoolId) schoolId = bodySchoolId;
     if (!schoolId) {
       return res.status(400).json({ error: 'schoolId is required' });
     }
 
-    // ── Use safe upsert ──
     await safeUpsertSubscription({ fcmToken, schoolId, userId, role });
 
     res.json({ success: true });
