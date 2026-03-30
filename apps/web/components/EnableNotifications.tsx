@@ -6,10 +6,10 @@ import { Bell, Check, BellOff } from 'lucide-react';
 import { requestNotificationPermission } from '@/app/lib/firebase';
 
 interface Props {
-  role:         string;          // 'parent' | 'teacher' | 'admin'
-  schoolId?:    string;          // for admin/teacher (single school)
-  parentToken?: string;          // parent JWT — backend will extract all school IDs
-  compact?:     boolean;         // true = icon only (for dashboard header)
+  role:         string;
+  schoolId?:    string;
+  parentToken?: string;
+  compact?:     boolean;
 }
 
 export default function EnableNotifications({ role, schoolId, parentToken, compact }: Props) {
@@ -18,7 +18,6 @@ export default function EnableNotifications({ role, schoolId, parentToken, compa
 
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
-  // Token to send as Authorization header
   const getToken = () => {
     if (typeof window === 'undefined') return '';
     if (parentToken) return parentToken;
@@ -27,11 +26,25 @@ export default function EnableNotifications({ role, schoolId, parentToken, compa
 
   useEffect(() => {
     setMounted(true);
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'granted') setStatus('granted');
-      if (Notification.permission === 'denied')  setStatus('denied');
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+
+    const permission = Notification.permission;
+
+    if (permission === 'denied') {
+      setStatus('denied');
+      return;
     }
-  }, []);
+
+    if (permission === 'granted') {
+      // ── KEY FIX: Browser says granted but DB may be empty (after reset).
+      // Always re-send token to backend on mount to stay in sync.
+      setStatus('loading');
+      requestNotificationPermission(role, API, getToken(), schoolId)
+        .then(ok => setStatus(ok ? 'granted' : 'idle'))
+        .catch(() => setStatus('idle'));
+    }
+    // permission === 'default' → stay 'idle' so button shows
+  }, []);  // only run once on mount
 
   if (!mounted || typeof window === 'undefined' || !('Notification' in window)) return null;
 
@@ -41,33 +54,40 @@ export default function EnableNotifications({ role, schoolId, parentToken, compa
       role,
       API,
       getToken(),
-      schoolId,  // for parents this may be undefined — backend handles it via JWT
+      schoolId,
     );
     setStatus(success ? 'granted' : 'denied');
   };
 
   // ── Compact mode (icon only for dashboard header) ─────────────────────────
   if (compact) {
+    if (status === 'loading') return (
+      <div style={{ width:34, height:34, borderRadius:9, background:'rgba(201,150,58,.1)', border:'1px solid rgba(201,150,58,.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ width:14, height:14, borderRadius:'50%', border:'2px solid rgba(201,150,58,.3)', borderTopColor:'#C9963A', animation:'spin .7s linear infinite' }} />
+      </div>
+    );
+
     if (status === 'granted') return (
       <div title="Notifications enabled"
         style={{ width:34, height:34, borderRadius:9, background:'rgba(34,197,94,.15)', border:'1px solid rgba(34,197,94,.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
         <Bell size={15} color="#22C55E" fill="rgba(34,197,94,.3)" />
       </div>
     );
+
     if (status === 'denied') return (
       <div title="Notifications blocked — enable in browser settings"
         style={{ width:34, height:34, borderRadius:9, background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.2)', display:'flex', alignItems:'center', justifyContent:'center' }}>
         <BellOff size={15} color="#EF4444" />
       </div>
     );
+
+    // idle — clickable bell
     return (
-      <button onClick={handleEnable} disabled={status === 'loading'} title="Enable notifications"
+      <button onClick={handleEnable} title="Enable notifications"
         style={{ width:34, height:34, borderRadius:9, background:'rgba(201,150,58,.1)', border:'1px solid rgba(201,150,58,.3)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all .2s' }}
         onMouseOver={e => (e.currentTarget.style.background='rgba(201,150,58,.2)')}
         onMouseOut={e  => (e.currentTarget.style.background='rgba(201,150,58,.1)')}>
-        {status === 'loading'
-          ? <div style={{ width:14, height:14, borderRadius:'50%', border:'2px solid rgba(201,150,58,.3)', borderTopColor:'#C9963A', animation:'spin .7s linear infinite' }} />
-          : <Bell size={15} color="#C9963A" />}
+        <Bell size={15} color="#C9963A" />
       </button>
     );
   }
