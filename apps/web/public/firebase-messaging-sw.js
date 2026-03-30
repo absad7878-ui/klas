@@ -29,7 +29,15 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-
+// Add inside onBackgroundMessage, after showNotification:
+self.clients.matchAll({ type: 'window' }).then(clients => {
+  clients.forEach(client => client.postMessage({
+    type:  'PUSH_NOTIFICATION',
+    title: title,
+    body:  body,
+    url:   payload.data?.url,
+  }));
+});
 
 // ── Notification click → open URL ─────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
