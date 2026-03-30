@@ -46,6 +46,29 @@ export default function ParentDashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Subscribe to push notifications for each child's school
+useEffect(() => {
+  if (!parentToken || children.length === 0) return;
+
+  const subscribeToSchools = async () => {
+    // Get unique school IDs from children
+    const schoolIds = [...new Set(children.map(c => c.school.id))];
+
+    for (const schoolId of schoolIds) {
+      try {
+        // Import and call requestNotificationPermission for each school
+        const { requestNotificationPermission } = await import('@/app/lib/firebase');
+        await requestNotificationPermission('parent', API, parentToken, schoolId);
+      } catch { /* silent */ }
+    }
+  };
+
+  // Only run if notifications already granted (don't prompt again)
+  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+    subscribeToSchools();
+  }
+}, [parentToken, children]);
+
   const logout = () => { localStorage.removeItem('parentToken'); router.push('/parent/login'); };
 
   if (loading) return (
