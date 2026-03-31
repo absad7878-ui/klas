@@ -1,42 +1,43 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Bell, X, Clock } from 'lucide-react';
+import { Bell, X, Clock, ChevronRight, Megaphone } from 'lucide-react';
 
 interface Announcement {
-  id: string;
-  title: string;
-  content: string;
+  id:             string;
+  title:          string;
+  content:        string;
   targetAudience: string;
-  createdAt: string;
+  createdAt:      string;
 }
 
-export default function NotificationBell({
-  apiUrl,
-  token,
-  role = 'teacher',
-}: {
-  apiUrl: string;
-  token: string;
-  role?: string;
-}) {
-  const [open, setOpen] = useState(false);
+interface Props {
+  apiUrl:     string;
+  token:      string;
+  role?:      string;       // 'teacher' | 'parent' | 'admin'
+  subdomain?: string;       // for parents — uses public endpoint
+}
+
+export default function NotificationBell({ apiUrl, token, role = 'teacher', subdomain }: Props) {
+  const [open,          setOpen]          = useState(false);
+  const [selected,      setSelected]      = useState<Announcement | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [unread, setUnread] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [unread,        setUnread]        = useState(0);
+  const [loading,       setLoading]       = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const STORAGE_KEY = `klas_last_read_${role}`;
 
   useEffect(() => {
-    if (!token) return;
+    if (!token && !subdomain) return;
     loadAnnouncements();
-  }, [token]);
+  }, [token, subdomain]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
+        setSelected(null);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -46,31 +47,35 @@ export default function NotificationBell({
   const loadAnnouncements = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiUrl}/announcements`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      let data: Announcement[] = [];
 
-      if (res.ok) {
-        const data: Announcement[] = await res.json();
-        setAnnouncements(data);
-
-        const lastRead = localStorage.getItem(STORAGE_KEY);
-        const lastReadTime = lastRead ? new Date(lastRead).getTime() : 0;
-
-        const unreadCount = data.filter(
-          (a) => new Date(a.createdAt).getTime() > lastReadTime
-        ).length;
-
-        setUnread(unreadCount);
+      if (subdomain) {
+        // Parent — use public endpoint by subdomain
+        const res = await fetch(`${apiUrl}/public/announcements?subdomain=${subdomain}`);
+        if (res.ok) {
+          const result = await res.json();
+          data = result.announcements || [];
+        }
+      } else if (token) {
+        // Teacher / Admin — use authenticated endpoint
+        const res = await fetch(`${apiUrl}/announcements`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) data = await res.json();
       }
-    } catch {}
-    finally {
-      setLoading(false);
-    }
+
+      setAnnouncements(data);
+
+      const lastRead     = localStorage.getItem(STORAGE_KEY);
+      const lastReadTime = lastRead ? new Date(lastRead).getTime() : 0;
+      setUnread(data.filter(a => new Date(a.createdAt).getTime() > lastReadTime).length);
+    } catch { /**/ }
+    finally { setLoading(false); }
   };
 
   const handleOpen = () => {
-    setOpen((o) => !o);
+    setOpen(o => !o);
+    setSelected(null);
     if (!open) {
       localStorage.setItem(STORAGE_KEY, new Date().toISOString());
       setUnread(0);
@@ -78,52 +83,24 @@ export default function NotificationBell({
   };
 
   const audienceInfo = (a: string) => {
-    if (a === 'parents')
-      return { label: 'Parents', bg: '#EFF6FF', color: '#2563EB' };
-    if (a === 'teachers')
-      return { label: 'Teachers', bg: '#ECFDF5', color: '#16A34A' };
-    return { label: 'Everyone', bg: '#FFF7ED', color: '#EA580C' };
+    if (a === 'parents')  return { label: 'Parents',  bg: '#EFF6FF', color: '#2563EB' };
+    if (a === 'teachers') return { label: 'Teachers', bg: '#ECFDF5', color: '#16A34A' };
+    return                       { label: 'Everyone', bg: '#FFF7ED', color: '#EA580C' };
   };
+
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+  const formatTime = (d: string) => new Date(d).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      {/* Bell */}
-      <button
-        onClick={handleOpen}
-        style={{
-          position: 'relative',
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          border: '1px solid rgba(255,255,255,.15)',
-          background: open ? 'rgba(201,150,58,.2)' : 'rgba(255,255,255,.08)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-        }}
-      >
-        <Bell size={18} color={open ? '#C9963A' : '#94A3B8'} />
+      <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}} @keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
+      {/* Bell button */}
+      <button onClick={handleOpen}
+        style={{ position:'relative', width:40, height:40, borderRadius:12, border:`1px solid ${open ? 'rgba(201,150,58,.4)' : 'rgba(255,255,255,.15)'}`, background: open ? 'rgba(201,150,58,.2)' : 'rgba(255,255,255,.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all .2s' }}>
+        <Bell size={17} color={open ? '#C9963A' : '#94A3B8'} fill={open ? 'rgba(201,150,58,.2)' : 'none'} />
         {unread > 0 && (
-          <span
-            style={{
-              position: 'absolute',
-              top: -5,
-              right: -5,
-              minWidth: 18,
-              height: 18,
-              padding: '0 5px',
-              borderRadius: 20,
-              background: '#EF4444',
-              color: '#fff',
-              fontSize: '0.65rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+          <span style={{ position:'absolute', top:-5, right:-5, minWidth:18, height:18, padding:'0 5px', borderRadius:20, background:'#EF4444', color:'#fff', fontSize:'.62rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>
             {unread > 9 ? '9+' : unread}
           </span>
         )}
@@ -131,148 +108,90 @@ export default function NotificationBell({
 
       {/* Dropdown */}
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '110%',
-            right: 0,
-            width: 340,
-            maxHeight: 420,
-            overflowY: 'auto',
-            background: '#ffffff',
-            borderRadius: 18,
-            boxShadow: '0 25px 70px rgba(0,0,0,0.15)',
-            border: '1px solid #E2E8F0',
-            zIndex: 999,
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              padding: '1rem',
-              borderBottom: '1px solid #F1F5F9',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <h4 style={{ margin: 0, fontSize: '.9rem', fontWeight: 700 }}>
-              Announcements
-            </h4>
+        <div style={{ position:'absolute', top:'110%', right:0, width:340, maxHeight:460, background:'#fff', borderRadius:18, boxShadow:'0 25px 70px rgba(0,0,0,.15)', border:'1px solid #E2E8F0', zIndex:999, animation:'slideDown .2s ease both', display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
-            <button
-              onClick={() => setOpen(false)}
-              style={{
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: 8,
-                padding: 5,
-                cursor: 'pointer',
-              }}
-            >
-              <X size={14} />
+          {/* Header */}
+          <div style={{ padding:'.9rem 1.1rem', borderBottom:'1px solid #F1F5F9', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
+              <div style={{ width:28, height:28, borderRadius:8, background:'rgba(201,150,58,.1)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <Megaphone size={13} color="#C9963A" />
+              </div>
+              <span style={{ fontWeight:700, fontSize:'.88rem', color:'#0B1D3A', fontFamily:"'DM Sans',sans-serif" }}>Announcements</span>
+            </div>
+            <button onClick={() => { setOpen(false); setSelected(null); }}
+              style={{ width:26, height:26, borderRadius:7, background:'#F1F5F9', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <X size={13} color="#64748B" />
             </button>
           </div>
 
           {/* Content */}
-          {loading ? (
-            <div style={{ padding: '2rem', textAlign: 'center' }}>
-              Loading...
-            </div>
-          ) : announcements.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center' }}>
-              No announcements yet
-            </div>
-          ) : (
-            <div style={{ padding: '.5rem' }}>
-              {announcements.map((a) => {
-                const aud = audienceInfo(a.targetAudience);
+          <div style={{ overflowY:'auto', flex:1 }}>
+            {loading ? (
+              <div style={{ padding:'2.5rem', textAlign:'center' }}>
+                <div style={{ width:28, height:28, borderRadius:'50%', border:'2px solid rgba(201,150,58,.2)', borderTopColor:'#C9963A', animation:'spin .7s linear infinite', margin:'0 auto' }} />
+              </div>
+            ) : selected ? (
+              /* ── Full announcement view ── */
+              <div style={{ padding:'1rem' }}>
+                <button onClick={() => setSelected(null)}
+                  style={{ display:'flex', alignItems:'center', gap:'.35rem', background:'none', border:'none', color:'#C9963A', fontSize:'.78rem', fontWeight:600, cursor:'pointer', marginBottom:'.85rem', fontFamily:"'DM Sans',sans-serif" }}>
+                  ← Back
+                </button>
+                <div style={{ display:'flex', alignItems:'center', gap:'.5rem', marginBottom:'.65rem', flexWrap:'wrap' }}>
+                  {(() => { const aud = audienceInfo(selected.targetAudience); return (
+                    <span style={{ fontSize:'.65rem', fontWeight:700, padding:'.18rem .55rem', borderRadius:20, background:aud.bg, color:aud.color }}>{aud.label}</span>
+                  ); })()}
+                  <span style={{ fontSize:'.7rem', color:'#94A3B8', display:'flex', alignItems:'center', gap:'.25rem' }}>
+                    <Clock size={10} /> {formatDate(selected.createdAt)} · {formatTime(selected.createdAt)}
+                  </span>
+                </div>
+                <h3 style={{ fontFamily:"'DM Sans',sans-serif", fontWeight:700, color:'#0B1D3A', fontSize:'.92rem', margin:'0 0 .75rem', lineHeight:1.3 }}>{selected.title}</h3>
+                <div style={{ background:'#F8FAFC', borderRadius:12, border:'1px solid #F1F5F9', padding:'.9rem 1rem' }}>
+                  <p style={{ color:'#334155', fontSize:'.83rem', lineHeight:1.75, margin:0, whiteSpace:'pre-line' }}>{selected.content}</p>
+                </div>
+              </div>
+            ) : announcements.length === 0 ? (
+              <div style={{ padding:'2.5rem 1.5rem', textAlign:'center' }}>
+                <Bell size={28} color="#E2E8F0" style={{ margin:'0 auto .75rem' }} />
+                <p style={{ color:'#94A3B8', fontSize:'.83rem', fontFamily:"'DM Sans',sans-serif" }}>No announcements yet</p>
+              </div>
+            ) : (
+              <div style={{ padding:'.5rem' }}>
+                {announcements.map(a => {
+                  const aud     = audienceInfo(a.targetAudience);
+                  const preview = a.content.length > 80 ? a.content.slice(0, 80) + '…' : a.content;
+                  return (
+                    <button key={a.id} onClick={() => setSelected(a)}
+                      style={{ width:'100%', textAlign:'left', padding:'.8rem', borderRadius:12, marginBottom:'.4rem', background:'#F8FAFC', border:'1px solid #F1F5F9', cursor:'pointer', transition:'background .15s', fontFamily:"'DM Sans',sans-serif" }}
+                      onMouseOver={e => (e.currentTarget.style.background='#F0F4FF')}
+                      onMouseOut={e  => (e.currentTarget.style.background='#F8FAFC')}>
+                      {/* Title + badge */}
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'.5rem', marginBottom:'.35rem' }}>
+                        <p style={{ fontWeight:600, fontSize:'.83rem', margin:0, color:'#0F172A', flex:1 }}>{a.title}</p>
+                        <span style={{ fontSize:'.6rem', fontWeight:700, padding:'2px 7px', borderRadius:20, background:aud.bg, color:aud.color, flexShrink:0 }}>{aud.label}</span>
+                      </div>
+                      {/* Preview */}
+                      <p style={{ fontSize:'.75rem', color:'#64748B', margin:'0 0 .4rem', lineHeight:1.5 }}>{preview}</p>
+                      {/* Date + read more */}
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:'.68rem', color:'#94A3B8' }}>
+                          <Clock size={10} /> {formatDate(a.createdAt)}
+                        </span>
+                        <span style={{ display:'flex', alignItems:'center', gap:2, fontSize:'.68rem', color:'#C9963A', fontWeight:600 }}>
+                          Read <ChevronRight size={11} />
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-                return (
-                  <div
-                    key={a.id}
-                    style={{
-                      padding: '.8rem',
-                      borderRadius: 12,
-                      marginBottom: '.5rem',
-                      background: '#F8FAFC',
-                      transition: '0.2s',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {/* Title + Badge */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        gap: '.5rem',
-                      }}
-                    >
-                      <p
-                        style={{
-                          fontWeight: 600,
-                          fontSize: '.85rem',
-                          margin: 0,
-                          color: '#0F172A',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          flex: 1,
-                        }}
-                      >
-                        {a.title}
-                      </p>
-
-                      <span
-                        style={{
-                          fontSize: '.6rem',
-                          fontWeight: 700,
-                          padding: '3px 8px',
-                          borderRadius: 20,
-                          background: aud.bg,
-                          color: aud.color,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {aud.label}
-                      </span>
-                    </div>
-
-                    {/* Content */}
-                    <p
-                      style={{
-                        fontSize: '.75rem',
-                        color: '#64748B',
-                        margin: '6px 0',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {a.content}
-                    </p>
-
-                    {/* Date */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        fontSize: '.7rem',
-                        color: '#94A3B8',
-                      }}
-                    >
-                      <Clock size={11} />
-                      {new Date(a.createdAt).toLocaleDateString('en-NG', {
-                        day: 'numeric',
-                        month: 'short',
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Footer */}
+          {announcements.length > 0 && !selected && (
+            <div style={{ padding:'.65rem 1rem', borderTop:'1px solid #F1F5F9', textAlign:'center', flexShrink:0 }}>
+              <p style={{ fontSize:'.72rem', color:'#94A3B8', margin:0 }}>{announcements.length} announcement{announcements.length !== 1 ? 's' : ''}</p>
             </div>
           )}
         </div>

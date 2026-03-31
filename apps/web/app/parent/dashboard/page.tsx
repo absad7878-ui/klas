@@ -9,6 +9,7 @@ import {
   BookOpen, Calendar, FileText, GraduationCap
 } from 'lucide-react';
 import EnableNotifications from '@/components/EnableNotifications';
+import NotificationBell from '@/components/NotificationBell';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -106,8 +107,12 @@ useEffect(() => {
 
           {/* Right side: bell + logout */}
           <div style={{ display:'flex', alignItems:'center', gap:'.6rem' }}>
-            <EnableNotifications role="parent" parentToken={parentToken} compact={true} />
-            <button onClick={logout}
+  {/* Show announcement bell only when token is ready */}
+  {parentToken && (
+    <NotificationBell apiUrl={API} token={parentToken} role="parent" />
+  )}
+  <EnableNotifications role="parent" parentToken={parentToken} compact={true} />
+  <button onClick={logout}
               style={{ display:'flex', alignItems:'center', gap:'.4rem', background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.12)', color:'#94A3B8', padding:'.45rem .85rem', borderRadius:9, fontSize:'.8rem', fontWeight:500, cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>
               <LogOut size={13} /> Logout
             </button>
