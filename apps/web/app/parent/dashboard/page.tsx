@@ -47,28 +47,22 @@ export default function ParentDashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Subscribe to push notifications for each child's school
-useEffect(() => {
-  if (!parentToken || children.length === 0) return;
+  // Re-subscribe to push notifications for each child's school when data loads
+  useEffect(() => {
+    if (!parentToken || children.length === 0) return;
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
 
-  const subscribeToSchools = async () => {
-    // Get unique school IDs from children
     const schoolIds = [...new Set(children.map(c => c.school.id))];
-
-    for (const schoolId of schoolIds) {
-      try {
-        // Import and call requestNotificationPermission for each school
-        const { requestNotificationPermission } = await import('@/app/lib/firebase');
-        await requestNotificationPermission('parent', API, parentToken, schoolId);
-      } catch { /* silent */ }
-    }
-  };
-
-  // Only run if notifications already granted (don't prompt again)
-  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-    subscribeToSchools();
-  }
-}, [parentToken, children]);
+    (async () => {
+      for (const schoolId of schoolIds) {
+        try {
+          const { requestNotificationPermission } = await import('@/app/lib/firebase');
+          await requestNotificationPermission('parent', API, parentToken, schoolId);
+        } catch { /* silent */ }
+      }
+    })();
+  }, [parentToken, children]);
 
   const logout = () => { localStorage.removeItem('parentToken'); router.push('/parent/login'); };
 
@@ -105,14 +99,23 @@ useEffect(() => {
             <span style={{ fontFamily:"'Cormorant Garamond',serif", color:'#fff', fontWeight:700, fontSize:'1rem' }}>Parent Portal</span>
           </div>
 
-          {/* Right side: bell + logout */}
+          {/* Right side: enable notifications + bell + logout */}
           <div style={{ display:'flex', alignItems:'center', gap:'.6rem' }}>
-  {/* Show announcement bell only when token is ready */}
-  {parentToken && (
-    <NotificationBell apiUrl={API} token={parentToken} role="parent" />
-  )}
- 
-  <button onClick={logout}
+
+            {/* Push notification toggle */}
+            <EnableNotifications role="parent" parentToken={parentToken} compact={true} />
+
+            {/* Announcements bell — uses /parent/announcements endpoint */}
+            {parentToken && (
+              <NotificationBell
+                apiUrl={API}
+                token={parentToken}
+                role="parent"
+                parentEndpoint={`${API}/parent/announcements`}
+              />
+            )}
+
+            <button onClick={logout}
               style={{ display:'flex', alignItems:'center', gap:'.4rem', background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.12)', color:'#94A3B8', padding:'.45rem .85rem', borderRadius:9, fontSize:'.8rem', fontWeight:500, cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }}>
               <LogOut size={13} /> Logout
             </button>
@@ -162,8 +165,6 @@ useEffect(() => {
           <div style={{ display:'flex', flexDirection:'column', gap:'1.1rem' }}>
             {children.map((child, i) => (
               <div key={child.id} className="child-card" style={{ animationDelay:`${i * 0.08}s` }}>
-
-                {/* Child header */}
                 <div style={{ background:'#0B1D3A', padding:'1.1rem 1.25rem', display:'flex', alignItems:'center', gap:'1rem' }}>
                   <div style={{ width:46, height:46, borderRadius:12, background:'linear-gradient(135deg,#C9963A,#E8B85A)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                     <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:800, color:'#0B1D3A', fontSize:'1.15rem' }}>
@@ -183,7 +184,6 @@ useEffect(() => {
                   )}
                 </div>
 
-                {/* Quick actions */}
                 <div style={{ padding:'1rem 1.25rem', display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'.6rem' }}>
                   {[
                     { href:`/parent/student/${child.id}`,           icon: Calendar,  label:'Attendance',  color:'#059669' },
