@@ -8,7 +8,6 @@ import {
   School, LogOut, Users, ChevronRight,
   BookOpen, Calendar, FileText, GraduationCap
 } from 'lucide-react';
-import EnableNotifications from '@/components/EnableNotifications';
 import NotificationBell from '@/components/NotificationBell';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -102,16 +101,14 @@ export default function ParentDashboardPage() {
           {/* Right side: enable notifications + bell + logout */}
           <div style={{ display:'flex', alignItems:'center', gap:'.6rem' }}>
 
-            {/* Push notification toggle */}
-            <EnableNotifications role="parent" parentToken={parentToken} compact={true} />
-
-            {/* Announcements bell — uses /parent/announcements endpoint */}
+            {/* Single bell — handles push enable + announcements */}
             {parentToken && (
               <NotificationBell
                 apiUrl={API}
                 token={parentToken}
                 role="parent"
                 parentEndpoint={`${API}/parent/announcements`}
+                parentToken={parentToken}
               />
             )}
 

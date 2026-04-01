@@ -1,8 +1,10 @@
 'use client';
 // apps/web/components/NotificationBell.tsx
+// Single bell that handles BOTH push subscription AND announcement dropdown
 
 import { useState, useEffect, useRef } from 'react';
-import { Bell, X, Clock, ChevronRight, Megaphone } from 'lucide-react';
+import { Bell, X, Clock, ChevronRight, Megaphone, BellOff } from 'lucide-react';
+import { requestNotificationPermission } from '@/app/lib/firebase';
 
 interface Announcement {
   id:             string;
@@ -17,29 +19,44 @@ interface Props {
   token:           string;
   role?:           string;
   subdomain?:      string;
-  parentEndpoint?: string;  // ← NEW: custom endpoint for parents
+  parentEndpoint?: string;
+  schoolId?:       string;
+  parentToken?:    string;
 }
 
-export default function NotificationBell({ apiUrl, token, role = 'teacher', subdomain, parentEndpoint }: Props) {
+export default function NotificationBell({
+  apiUrl, token, role = 'teacher', subdomain, parentEndpoint, schoolId, parentToken,
+}: Props) {
   const [open,          setOpen]          = useState(false);
   const [selected,      setSelected]      = useState<Announcement | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [unread,        setUnread]        = useState(0);
   const [loading,       setLoading]       = useState(false);
+  const [pushStatus,    setPushStatus]    = useState<'idle'|'loading'|'granted'|'denied'>('idle');
   const ref = useRef<HTMLDivElement>(null);
 
   const STORAGE_KEY = `klas_last_read_${role}`;
+  const authToken   = parentToken || token;
 
+  // ── Init push notification status ─────────────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    const p = Notification.permission;
+    if (p === 'granted') setPushStatus('granted');
+    if (p === 'denied')  setPushStatus('denied');
+  }, []);
+
+  // ── Load announcements on mount ────────────────────────────────────────────
   useEffect(() => {
     if (!token && !subdomain) return;
     loadAnnouncements();
   }, [token, subdomain]);
 
+  // ── Close on outside click ─────────────────────────────────────────────────
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSelected(null);
+        setOpen(false); setSelected(null);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -51,23 +68,17 @@ export default function NotificationBell({ apiUrl, token, role = 'teacher', subd
     try {
       let data: Announcement[] = [];
 
-      if (parentEndpoint && token) {
-        // ── Parent: use dedicated /parent/announcements endpoint ──
+      if (parentEndpoint && authToken) {
         const res = await fetch(parentEndpoint, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${authToken}` },
         });
         if (res.ok) data = await res.json();
 
       } else if (subdomain) {
-        // Public: use subdomain endpoint
         const res = await fetch(`${apiUrl}/public/announcements?subdomain=${subdomain}`);
-        if (res.ok) {
-          const result = await res.json();
-          data = result.announcements || [];
-        }
+        if (res.ok) { const r = await res.json(); data = r.announcements || []; }
 
       } else if (token) {
-        // Admin/Teacher: use authenticated endpoint
         const res = await fetch(`${apiUrl}/announcements`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -75,15 +86,25 @@ export default function NotificationBell({ apiUrl, token, role = 'teacher', subd
       }
 
       setAnnouncements(data);
-
       const lastRead     = localStorage.getItem(STORAGE_KEY);
       const lastReadTime = lastRead ? new Date(lastRead).getTime() : 0;
       setUnread(data.filter(a => new Date(a.createdAt).getTime() > lastReadTime).length);
-
     } catch { /**/ }
     finally { setLoading(false); }
   };
 
+  // ── Enable push notifications ──────────────────────────────────────────────
+  const enablePush = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (pushStatus === 'granted' || pushStatus === 'loading') return;
+    setPushStatus('loading');
+    try {
+      const ok = await requestNotificationPermission(role, apiUrl, authToken, schoolId);
+      setPushStatus(ok ? 'granted' : 'denied');
+    } catch { setPushStatus('idle'); }
+  };
+
+  // ── Open/close dropdown ────────────────────────────────────────────────────
   const handleOpen = () => {
     setOpen(o => !o);
     setSelected(null);
@@ -104,9 +125,12 @@ export default function NotificationBell({ apiUrl, token, role = 'teacher', subd
 
   return (
     <div ref={ref} style={{ position:'relative' }}>
-      <style>{`@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}} @keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`
+        @keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes spin { to{transform:rotate(360deg)} }
+      `}</style>
 
-      {/* Bell button */}
+      {/* ── Single Bell Button ── */}
       <button onClick={handleOpen}
         style={{ position:'relative', width:40, height:40, borderRadius:12, border:`1px solid ${open?'rgba(201,150,58,.4)':'rgba(255,255,255,.15)'}`, background:open?'rgba(201,150,58,.2)':'rgba(255,255,255,.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all .2s' }}>
         <Bell size={17} color={open?'#C9963A':'#94A3B8'} fill={open?'rgba(201,150,58,.2)':'none'} />
@@ -117,9 +141,25 @@ export default function NotificationBell({ apiUrl, token, role = 'teacher', subd
         )}
       </button>
 
-      {/* Dropdown */}
+      {/* ── Dropdown — responsive, won't cut off on mobile ── */}
       {open && (
-        <div style={{ position:'absolute', top:'110%', right:0, width:340, maxHeight:460, background:'#fff', borderRadius:18, boxShadow:'0 25px 70px rgba(0,0,0,.15)', border:'1px solid #E2E8F0', zIndex:999, animation:'slideDown .2s ease both', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+        <div style={{
+          position:   'fixed',           // fixed so it's never clipped by parent overflow
+          top:        60,                // below the sticky header
+          right:      8,                 // 8px from screen edge
+          left:       'auto',
+          width:      'min(340px, calc(100vw - 16px))',  // never wider than screen
+          maxHeight:  'calc(100vh - 80px)',
+          background: '#fff',
+          borderRadius: 18,
+          boxShadow:  '0 25px 70px rgba(0,0,0,.18)',
+          border:     '1px solid #E2E8F0',
+          zIndex:     9999,
+          animation:  'slideDown .2s ease both',
+          display:    'flex',
+          flexDirection: 'column',
+          overflow:   'hidden',
+        }}>
 
           {/* Header */}
           <div style={{ padding:'.9rem 1.1rem', borderBottom:'1px solid #F1F5F9', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
@@ -129,10 +169,27 @@ export default function NotificationBell({ apiUrl, token, role = 'teacher', subd
               </div>
               <span style={{ fontWeight:700, fontSize:'.88rem', color:'#0B1D3A', fontFamily:"'DM Sans',sans-serif" }}>Announcements</span>
             </div>
-            <button onClick={() => { setOpen(false); setSelected(null); }}
-              style={{ width:26, height:26, borderRadius:7, background:'#F1F5F9', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-              <X size={13} color="#64748B" />
-            </button>
+            <div style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
+              {/* Push notification status pill */}
+              {'Notification' in window && (
+                <button onClick={enablePush} title={pushStatus==='granted'?'Notifications on':pushStatus==='denied'?'Notifications blocked':pushStatus==='loading'?'Enabling…':'Enable notifications'}
+                  style={{ display:'flex', alignItems:'center', gap:'.3rem', padding:'.25rem .6rem', borderRadius:20, border:'none', cursor:pushStatus==='granted'||pushStatus==='denied'?'default':'pointer', fontFamily:"'DM Sans',sans-serif", fontSize:'.65rem', fontWeight:700,
+                    background: pushStatus==='granted'?'#DCFCE7':pushStatus==='denied'?'#FEE2E2':'rgba(201,150,58,.12)',
+                    color:      pushStatus==='granted'?'#15803D':pushStatus==='denied'?'#DC2626':'#C9963A',
+                  }}>
+                  {pushStatus==='loading'
+                    ? <div style={{ width:10, height:10, borderRadius:'50%', border:'1.5px solid rgba(201,150,58,.3)', borderTopColor:'#C9963A', animation:'spin .7s linear infinite' }} />
+                    : pushStatus==='granted' ? <Bell size={10} />
+                    : pushStatus==='denied'  ? <BellOff size={10} />
+                    : <Bell size={10} />}
+                  {pushStatus==='granted'?'On':pushStatus==='denied'?'Blocked':pushStatus==='loading'?'…':'Enable'}
+                </button>
+              )}
+              <button onClick={() => { setOpen(false); setSelected(null); }}
+                style={{ width:26, height:26, borderRadius:7, background:'#F1F5F9', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <X size={13} color="#64748B" />
+              </button>
+            </div>
           </div>
 
           {/* Content */}
@@ -162,8 +219,8 @@ export default function NotificationBell({ apiUrl, token, role = 'teacher', subd
               </div>
             ) : announcements.length === 0 ? (
               <div style={{ padding:'2.5rem 1.5rem', textAlign:'center' }}>
-                <Bell size={28} color="#E2E8F0" style={{ margin:'0 auto .75rem' }} />
-                <p style={{ color:'#94A3B8', fontSize:'.83rem', fontFamily:"'DM Sans',sans-serif" }}>No announcements yet</p>
+                <Bell size={28} color="#E2E8F0" style={{ margin:'0 auto .75rem', display:'block' }} />
+                <p style={{ color:'#94A3B8', fontSize:'.83rem', fontFamily:"'DM Sans',sans-serif", margin:0 }}>No announcements yet</p>
               </div>
             ) : (
               <div style={{ padding:'.5rem' }}>
@@ -172,7 +229,7 @@ export default function NotificationBell({ apiUrl, token, role = 'teacher', subd
                   const preview = a.content.length > 80 ? a.content.slice(0, 80) + '…' : a.content;
                   return (
                     <button key={a.id} onClick={() => setSelected(a)}
-                      style={{ width:'100%', textAlign:'left', padding:'.8rem', borderRadius:12, marginBottom:'.4rem', background:'#F8FAFC', border:'1px solid #F1F5F9', cursor:'pointer', transition:'background .15s', fontFamily:"'DM Sans',sans-serif" }}
+                      style={{ width:'100%', textAlign:'left', padding:'.8rem', borderRadius:12, marginBottom:'.4rem', background:'#F8FAFC', border:'1px solid #F1F5F9', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", display:'block' }}
                       onMouseOver={e => (e.currentTarget.style.background='#F0F4FF')}
                       onMouseOut={e  => (e.currentTarget.style.background='#F8FAFC')}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'.5rem', marginBottom:'.35rem' }}>
