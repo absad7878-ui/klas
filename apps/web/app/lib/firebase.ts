@@ -1,6 +1,6 @@
 // apps/web/app/lib/firebase.ts
 import { initializeApp, getApps } from 'firebase/app';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getMessaging, getToken, deleteToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyAjWXwWOuKtaPzZI4YuZUJGpM89Ju49ah4',
@@ -11,14 +11,39 @@ const firebaseConfig = {
   appId:             '1:587356351861:web:f315b5e50d59875756f73c',
 };
 
-// Init Firebase only once
 export const app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
+
+// ── Check if a valid FCM token exists (without prompting user) ────────────────
+// Returns the token string if valid, null if unsubscribed or expired
+export async function checkExistingToken(): Promise<string | null> {
+  try {
+    if (typeof window === 'undefined') return null;
+    if (!('Notification' in window)) return null;
+    if (Notification.permission !== 'granted') return null;
+
+    const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+    await navigator.serviceWorker.ready;
+
+    const messaging = getMessaging(app);
+
+    // getToken returns empty string if token was deleted/revoked
+    const fcmToken = await getToken(messaging, {
+      vapidKey:                  process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: swReg,
+    });
+
+    return fcmToken || null;
+  } catch {
+    // Token doesn't exist or service worker failed
+    return null;
+  }
+}
 
 // ── Request permission + get FCM token + save to backend ─────────────────────
 export async function requestNotificationPermission(
-  role:     string,
-  apiUrl:   string,
-  token:    string,
+  role:      string,
+  apiUrl:    string,
+  token:     string,
   schoolId?: string,
 ): Promise<boolean> {
   try {
@@ -32,17 +57,15 @@ export async function requestNotificationPermission(
       return false;
     }
 
-    // 2. Wait for the Firebase service worker specifically
-    const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-      scope: '/',
-    });
+    // 2. Register Firebase service worker
+    const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
     await navigator.serviceWorker.ready;
 
-    // 3. Get FCM token using our service worker
+    // 3. Get FCM token
     const messaging = getMessaging(app);
     const fcmToken  = await getToken(messaging, {
-      vapidKey:                    process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-      serviceWorkerRegistration:   swReg,
+      vapidKey:                  process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+      serviceWorkerRegistration: swReg,
     });
 
     if (!fcmToken) {
@@ -68,7 +91,7 @@ export async function requestNotificationPermission(
       return false;
     }
 
-    console.log('[FCM] Subscription saved to backend ✓');
+    console.log('[FCM] Subscription saved ✓');
     return true;
   } catch (err) {
     console.error('[FCM] requestNotificationPermission error:', err);
@@ -76,7 +99,7 @@ export async function requestNotificationPermission(
   }
 }
 
-// ── Foreground message handler (when app is open) ─────────────────────────────
+// ── Foreground message handler ─────────────────────────────────────────────────
 export function onForegroundMessage(callback: (payload: any) => void) {
   if (typeof window === 'undefined') return () => {};
   try {

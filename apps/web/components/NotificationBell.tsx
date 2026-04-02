@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Bell, X, Clock, ChevronRight, Megaphone, BellOff } from 'lucide-react';
-import { requestNotificationPermission } from '@/app/lib/firebase';
+import { requestNotificationPermission, checkExistingToken } from '@/app/lib/firebase';
 
 interface Announcement {
   id:             string;
@@ -39,11 +39,30 @@ export default function NotificationBell({
   const authToken   = parentToken || token;
 
   // ── Init push notification status ─────────────────────────────────────────
+  // Verify token actually exists — don't just trust browser permission
+  // User may have unsubscribed via browser settings (token deleted but permission still 'granted')
   useEffect(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
+
     const p = Notification.permission;
-    if (p === 'granted') setPushStatus('granted');
-    if (p === 'denied')  setPushStatus('denied');
+
+    if (p === 'denied') {
+      setPushStatus('denied');
+      return;
+    }
+
+    if (p === 'granted') {
+      // ── KEY: Check if FCM token still exists, not just browser permission ──
+      setPushStatus('loading');
+      checkExistingToken().then(token => {
+        if (token) {
+          setPushStatus('granted');  // Token exists → truly subscribed
+        } else {
+          setPushStatus('idle');     // Token gone → user unsubscribed → show Enable button
+        }
+      }).catch(() => setPushStatus('idle'));
+    }
+    // p === 'default' → stay 'idle'
   }, []);
 
   // ── Load announcements on mount ────────────────────────────────────────────
