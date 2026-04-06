@@ -13,7 +13,6 @@ import {
   CheckCircle, MessageSquare, BarChart3, Shield, Sparkles, X
 } from 'lucide-react';
 
-export const metadata = homepageMetadata;
 export default function Home() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
