@@ -81,7 +81,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 
   verification: {
-    google: 'YOUR_GOOGLE_SEARCH_CONSOLE_TOKEN', // replace after adding site to Google Search Console
+    google: '3qudodu5A36_zU8EAipgoQiWUpT-FuHFt7vQWylx_lA', // replace after adding site to Google Search Console
   },
 };
 
