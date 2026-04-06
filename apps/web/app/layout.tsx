@@ -1,59 +1,95 @@
-import type { Metadata } from "next";
-import localFont from "next/font/local";
-import "./globals.css";
-import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+// apps/web/app/layout.tsx
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "KLAS School App",
-  description: "Modern school management platform",
-  manifest: "/manifest.json",
-  themeColor: "#0B1D3A",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "KLAS",
+  metadataBase: new URL('https://www.klas.ng'),
+
+  title: {
+    default:  'Klas — Affordable School Management System in Nigeria',
+    template: '%s | Klas School Management',
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
+
+  description: 'Klas.ng is a simple and affordable school management system for Nigerian schools. Manage students, attendance, fees, exam results, and SMS notifications — all in one platform.',
+
+  keywords: [
+    'school management system Nigeria',
+    'school software Nigeria',
+    'affordable school SaaS Nigeria',
+    'student management system',
+    'school fees management Nigeria',
+    'attendance tracking Nigeria',
+    'school SMS Nigeria',
+    'report card software Nigeria',
+    'private school software Nigeria',
+    'klas.ng',
+  ],
+
+  authors: [{ name: 'Klas', url: 'https://www.klas.ng' }],
+  creator:  'Klas School Management Platform',
+  publisher: 'Klas',
+
+  openGraph: {
+    type:        'website',
+    locale:      'en_NG',
+    url:         'https://www.klas.ng',
+    siteName:    'Klas School Management',
+    title:       'Klas — Affordable School Management System in Nigeria',
+    description: 'Manage students, attendance, fees, and exam results for your Nigerian school — all in one simple platform. Start free for 14 days.',
+    images: [
+      {
+        url:    '/og-image.png',  // Create a 1200×630px image and put in /public/
+        width:  1200,
+        height: 630,
+        alt:    'Klas School Management Platform',
+      },
+    ],
+  },
+
+  twitter: {
+    card:        'summary_large_image',
+    title:       'Klas — School Management System for Nigerian Schools',
+    description: 'Attendance, fees, SMS, exam results — everything your school needs in one platform.',
+    images:      ['/og-image.png'],
+    creator:     '@klasng',
+  },
+
+  robots: {
+    index:          true,
+    follow:         true,
+    googleBot: {
+      index:             true,
+      follow:            true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet':       -1,
+    },
+  },
+
+  alternates: {
+    canonical: 'https://www.klas.ng',
+  },
+
+  icons: {
+    icon:        '/favicon.ico',
+    shortcut:    '/favicon-16x16.png',
+    apple:       '/apple-touch-icon.png',
+  },
+
+  manifest: '/manifest.json',
+
+  verification: {
+    google: 'YOUR_GOOGLE_SEARCH_CONSOLE_TOKEN', // replace after adding site to Google Search Console
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full scroll-smooth">
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#0B1D3A" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="KLAS" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-gray-50 text-gray-900 antialiased w-full m-0 p-0`}
-      >
-        <div className="w-full min-h-screen flex flex-col items-center">
-          {children}
-        </div>
-        <ServiceWorkerRegister />
+    <html lang="en">
+      <body className={inter.className}>
+        {children}
       </body>
     </html>
   );

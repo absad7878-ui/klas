@@ -4,12 +4,16 @@ import Link from 'next/link';
 import InstallButton from '@/components/InstallButton';
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import JsonLd from '@/components/JsonLd';
+import { homepageMetadata } from '@/app/seo-metadata';
+
 import {
   Search, GraduationCap, BookOpen,
   ArrowRight, MapPin, School, Users, Lock, Eye,
   CheckCircle, MessageSquare, BarChart3, Shield, Sparkles, X
 } from 'lucide-react';
 
+export const metadata = homepageMetadata;
 export default function Home() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -122,6 +126,8 @@ export default function Home() {
   ];
 
   return (
+    <>
+    <JsonLd />
     <div style={{ minHeight:'100vh', width:'100%', overflowX:'hidden', background:'#060D1F', fontFamily:"'DM Sans', sans-serif", color:'#fff' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -564,5 +570,6 @@ export default function Home() {
         </div>
       </footer>
     </div>
+      </>
   );
 }

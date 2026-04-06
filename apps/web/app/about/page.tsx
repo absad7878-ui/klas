@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { ArrowRight, School, Users, Globe, Shield, Zap, Heart, CheckCircle, ArrowLeft } from 'lucide-react';
+import { aboutMetadata } from '@/app/seo-metadata';
 
+export const metadata = aboutMetadata;
 export default function AboutPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ fontFamily: "'DM Sans',sans-serif", background: '#F0EFE9' }}>

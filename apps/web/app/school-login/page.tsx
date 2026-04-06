@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { School, Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { adminLoginMetadata } from '@/app/seo-metadata';
 
+export const metadata = adminLoginMetadata;
 export default function SchoolLoginPage() {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');

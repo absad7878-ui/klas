@@ -4,7 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GraduationCap, Mail, Lock, ArrowRight, School } from 'lucide-react';
+import { teacherLoginMetadata } from '@/app/seo-metadata';
 
+
+export const metadata = teacherLoginMetadata;
 export default function TeacherLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

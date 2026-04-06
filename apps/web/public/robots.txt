@@ -1,0 +1,24 @@
+# robots.txt — klas.ng
+User-agent: *
+Allow: /
+
+# Block private areas from indexing
+Disallow: /dashboard/
+Disallow: /teacher/
+Disallow: /parent/dashboard
+Disallow: /parent/student/
+Disallow: /api/
+
+# Allow public pages
+Allow: /
+Allow: /register
+Allow: /school-login
+Allow: /teacher-login
+Allow: /parent/login
+Allow: /about
+Allow: /contact
+Allow: /privacy
+Allow: /terms
+
+# Sitemap location
+Sitemap: https://www.klas.ng/sitemap.xml

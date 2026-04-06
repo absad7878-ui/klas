@@ -7,7 +7,9 @@ import { z } from 'zod';
 import { Upload, AlertCircle, CheckCircle, School, ArrowRight, Building2, Mail, Lock, Globe, Phone, MapPin, BookOpen, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { registerMetadata } from '@/app/seo-metadata';
 
+export const metadata = registerMetadata;
 const registerSchema = z.object({
   name: z.string().min(3).max(100).trim(),
   subdomain: z
