@@ -126,7 +126,7 @@ export default function Home() {
   ];
 
   return (
-    <>
+    <div>
     <JsonLd />
     <div style={{ minHeight:'100vh', width:'100%', overflowX:'hidden', background:'#060D1F', fontFamily:"'DM Sans', sans-serif", color:'#fff' }}>
       <style>{`
@@ -570,6 +570,6 @@ export default function Home() {
         </div>
       </footer>
     </div>
-      </>
+      </div>
   );
 }
