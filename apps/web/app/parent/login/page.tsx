@@ -8,7 +8,7 @@ import { parentLoginMetadata } from '@/app/seo-metadata';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
-export const metadata = parentLoginMetadata;
+
 export default function ParentLoginPage() {
   const router = useRouter();
   const [mode, setMode]           = useState<'login' | 'forgot'>('login');

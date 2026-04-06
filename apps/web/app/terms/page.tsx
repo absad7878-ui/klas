@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, School, FileText } from 'lucide-react';
 import { termsMetadata } from '@/app/seo-metadata';
 
-export const metadata = termsMetadata;
+
 const LAST_UPDATED = 'January 1, 2025';
 
 const sections = [

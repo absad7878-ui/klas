@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, School, Mail, Phone, MapPin, MessageSquare, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { contactMetadata } from '@/app/seo-metadata';
 
-export const metadata = contactMetadata;
+
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
