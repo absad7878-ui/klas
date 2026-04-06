@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, School, Shield } from 'lucide-react';
 import { privacyMetadata } from '@/app/seo-metadata';
 
-export const metadata = privacyMetadata;
+
 const LAST_UPDATED = 'January 1, 2025';
 
 const sections = [
