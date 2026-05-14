@@ -6,6 +6,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import JsonLd from '@/components/JsonLd';
 import { homepageMetadata } from '@/app/seo-metadata';
+// Add this import at the top
+import AdBanner from '@/components/AdBanner'
 
 import {
   Search, GraduationCap, BookOpen,
@@ -456,6 +458,10 @@ export default function Home() {
         </div>
       </div>
 
+       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1.5rem' }}>
+        <AdBanner adSlot="3117282804" />
+      </div>
+
       {/* ── FEATURES WITH SCREENSHOTS ── */}
       <section className="features" id="features">
         <span className="section-eye">What We Offer</span>
@@ -492,6 +498,11 @@ export default function Home() {
         </div>
       </section>
 
+
+       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem 1.5rem' }}>
+        <AdBanner adSlot="3117282804" adFormat="horizontal" />
+      </div>
+
       {/* PORTALS */}
       <section className="portals" id="portals">
         <span className="section-eye">Access Portals</span>
@@ -521,6 +532,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem 1.5rem' }}>
+        <AdBanner adSlot="3117282804" adFormat="rectangle" />
+      </div>
 
       {/* CTA */}
       <section className="cta-section">
