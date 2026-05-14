@@ -1,6 +1,7 @@
 // apps/web/app/layout.tsx
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -10,7 +11,13 @@ export const metadata: Metadata = {
   title: {
     default:  'Klas — Affordable School Management System in Nigeria',
     template: '%s | Klas School Management',
+    
   },
+  other: {
+    'google-adsense-account': 'ca-pub-5461373361581754',
+  },
+
+  
 
   description: 'Klas.ng is a simple and affordable school management system for Nigerian schools. Manage students, attendance, fees, exam results, and SMS notifications — all in one platform.',
 
@@ -40,7 +47,7 @@ export const metadata: Metadata = {
     description: 'Manage students, attendance, fees, and exam results for your Nigerian school — all in one simple platform. Start free for 14 days.',
     images: [
       {
-        url:    '/og-image.png',  // Create a 1200×630px image and put in /public/
+        url:    '/og-image.png',
         width:  1200,
         height: 630,
         alt:    'Klas School Management Platform',
@@ -81,7 +88,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 
   verification: {
-    google: '3qudodu5A36_zU8EAipgoQiWUpT-FuHFt7vQWylx_lA', // replace after adding site to Google Search Console
+    google: '3qudodu5A36_zU8EAipgoQiWUpT-FuHFt7vQWylx_lA',
   },
 };
 
@@ -89,6 +96,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={inter.className}>
+
+        {/* ✅ Google AdSense */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5461373361581754"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+
         {children}
       </body>
     </html>
