@@ -8,7 +8,7 @@ export default function PrivacyPage() {
       <p>We collect an anonymous device ID generated on first launch, used only to track usage counts and subscription status. We do not collect your name, email, or any personal information.</p>
 
       <h2>2. How Your Text Is Handled</h2>
-      <p>Text is processed securely to generate responses and is not used to identify users or train external models.</p>
+      <p>Text is processed securely to gennerate responses and is not used to identify users or train external models.</p>
 
       <h2>3. Usage Data</h2>
       <p>We store daily request counts per anonymous device ID to enforce free-tier limits. This data contains no personally identifiable information.</p>
