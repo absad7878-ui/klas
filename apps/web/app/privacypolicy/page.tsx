@@ -1,7 +1,9 @@
 export default function PrivacyPage() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 24px', fontFamily: 'sans-serif', lineHeight: 1.7 }}>
-      <h1>Privacy Policy</h1>
+      
+      <h1 style={{ fontSize: '28px', marginBottom: '4px' }}>FluentKey Keyboard</h1>
+      <h2 style={{ fontSize: '22px', fontWeight: 'normal', marginBottom: '8px' }}>Privacy Policy</h2>
       <p><strong>Last updated: June 2026</strong></p>
 
       <h2>1. What We Collect</h2>
@@ -33,6 +35,7 @@ export default function PrivacyPage() {
 
       <h2>10. Contact</h2>
       <p>Privacy questions? Email us at <a href="mailto:fluentkey.support@gmail.com">fluentkey.support@gmail.com</a></p>
+
     </div>
   );
 }
