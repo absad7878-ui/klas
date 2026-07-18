@@ -98,7 +98,7 @@ export default function PrivacyPolicyImageCompressor() {
       <p>
         If you have questions about this Privacy Policy, contact us at:
         <br />
-        <a href="mailto:absadcompany@gmail.com">youremail@example.com</a>
+        <a href="mailto:youremail@example.com">absadcompany@gmail.com</a>
       </p>
     </div>
   );
