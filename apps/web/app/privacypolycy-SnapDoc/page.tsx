@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Privacy Policy — [DocScanner AI]",
+  title: "Privacy Policy — [SnapDoc AI]",
   description: "Privacy Policy for [DocScanner AI], a document scanner app.",
 };
 
@@ -290,7 +290,7 @@ export default function PrivacyPolicyDocScanner() {
         <p>
           If you have questions about this Privacy Policy, contact us at:
           <br />
-          <a href="mailto:[Absadcompany@gmail.com]">[email protected]</a>
+          <a href="mailto:[Absadish001@gmail.com]">[email protected]</a>
           <br />
           <span className="pp-placeholder">[]</span>
         </p>
