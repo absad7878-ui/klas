@@ -3,7 +3,7 @@
 
 const APP_NAME = "ConvertX";
 const DEVELOPER_NAME = "Absad"; // TODO: change to your name or company name
-const CONTACT_EMAIL = "your-email@example.com"; // TODO: change to a real email you check
+const CONTACT_EMAIL = "absadish001@gmail.com"; // TODO: change to a real email you check
 const LAST_UPDATED = "October 29, 2026";
 
 export const metadata = {
